@@ -1,5 +1,14 @@
 # GitHub初期設定
 
+## 今回専用の共有先
+
+- 所有者：`Shintaro123-isct`
+- リポジトリ： https://github.com/Shintaro123-isct/techspresso-coffee-app
+- 公開範囲：本人の許可によりPublic
+- 既存の別アプリのリポジトリは変更しない
+- Cloudflareとはまだ未接続。マージやpushで本番へ自動公開される設定はない
+- 参加メンバーはSettings > Collaboratorsで本人のGitHubユーザー名を指定して招待する。公開コードの閲覧と直接pushする権限は別である
+
 ## 初期状態（2026-10-20確認）
 
 - Git、GitHub CLI、Node.jsはこのPCにインストール済み。
@@ -28,4 +37,4 @@
 Cloudflare接続・本番切替・メンバー招待は初回pushとは別の操作である。
 既存の別アプリ開発用リポジトリのコード、設定、公開範囲、Cloudflare連携は一切変更しない。
 リポジトリの公開は、誰にでも本番操作やmainへのpushを許可することではない。直接変更できる共同開発者は所有者が選んで追加する。
-この手順書にリポジトリURLがない間は、GitHubへの公開が完了したと扱わない。
+コードのアップロードが完了したかはGitHub上のmainとファイルを読み取り確認する。

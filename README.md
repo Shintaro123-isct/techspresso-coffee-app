@@ -7,6 +7,8 @@
 現行Apps Script版を基準に、Cloudflare Workers + D1版へ移行するためのリポジトリです。
 Cloudflare版はまだ実装・公開していません。GitHubへのpushやマージだけでは、現在の公開アプリは変わりません。
 
+開発用リポジトリ：[Shintaro123-isct/techspresso-coffee-app](https://github.com/Shintaro123-isct/techspresso-coffee-app)
+
 - [共同開発の進め方](CONTRIBUTING.md)
 - [GitHub初期設定](docs/GITHUB_SETUP.md)
 - [Cloudflareへの移行方針](docs/CLOUDFLARE_MIGRATION.md)
