@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>TECHSPRESSO｜受け渡し管理</title>
+  <style>/* BUILD_STYLES */</style>
+</head>
+<body>
+  <div id="demo-banner" hidden>体験版 · この端末内だけの動作です。Googleスプレッドシートには接続していません。</div>
+  <header class="header"><div class="brand"><!-- BUILD_LOGO --><div><strong>TECHSPRESSO</strong><small>工大祭 · ドリンク受け渡し</small></div></div><div id="identity"></div></header>
+  <aside id="late-warning" class="late-warning" hidden role="status" aria-live="polite" aria-atomic="true"></aside>
+  <main id="app"></main>
+  <details class="panel" style="max-width:1100px;margin:20px auto;padding:20px"><summary>運用・復旧手順</summary>
+    <p>会計はAirレジで行い、お客様へ番号札を渡します。注文登録には「会計担当」を選択してください。カップへ商品・Hot/Iced・札・注文時刻・杯数番号（1/1、1/2など）を記入し、登録完了を確認してから抽出担当へ渡します。</p>
+    <p>完成品が提供場所にあっても、お客様へ渡すまでは未提供です。実際に渡した杯だけ提供済みにします。最後の杯で実物の札を回収し、会計へ戻った実物を確認して「札の返却確認」を行います。</p>
+    <p>アプリ停止時は全体指揮の指示で付箋運用へ切り替えます。停止後の新規注文は復旧後もアプリへ登録しません。一度付箋にした注文は最後まで付箋で管理します。</p>
+    <p>停止前の登録済み注文は全体指揮または指示された1名だけが記録シートから転記します。対象日の注文シートでB列「提供状況」の未提供を確認し、I列の注文ID、C列の札、D列の杯数番号、E/F列の商品と温度、A列の受付時刻を転記してください。表の更新が遅れている可能性もあるため、提供担当へ確認してください。</p>
+    <p>復旧後は全体指揮が管理者で「受け渡し」から古い注文の提供・札回収を反映し、「札の返却確認」で戻った実物を確認します。新規登録の再開は全体指揮が判断します。付箋注文のお客様が持っている札は再利用しません。記録シートを直接編集して状態を変更しないでください。</p>
+    <p>保存結果が不明なら同じ注文を新規登録せず、画面の「再送して保存状態を確認する」を使ってください。遅延注文の強調は状況確認の目安で、自動再抽出や自動受付停止は行いません。</p>
+  </details>
+  <div id="notice" role="status" aria-live="polite" hidden></div>
+  <div id="uncertain" class="uncertain" hidden role="alert"></div>
+  <footer>会計はAirレジで行います。ここではドリンクと番号札を管理します。</footer>
+  <script>/* BUILD_CORE */</script>
+  <script>/* BUILD_CLIENT */</script>
+</body>
+</html>

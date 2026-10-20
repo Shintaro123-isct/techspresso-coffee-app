@@ -1,0 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const root=path.dirname(fileURLToPath(import.meta.url));
+const read=name=>fs.readFileSync(path.join(root,'src',name),'utf8');
+const template=read('Index.html');
+const styles=read('styles.css'),client=read('client.js'),core=read('core.js');
+const logoData=fs.readFileSync(path.join(root,'assets','techspresso-official.png')).toString('base64');
+const logo='<svg class="brand-logo" viewBox="270 420 540 540" role="img" aria-label="TECHSPRESSO公式ロゴ" xmlns="http://www.w3.org/2000/svg" overflow="hidden"><image width="1080" height="1350" href="data:image/png;base64,'+logoData+'"/></svg>';
+const fill=demo=>template.replace('<!-- BUILD_LOGO -->',()=>logo).replace('/* BUILD_STYLES */',()=>styles).replace('/* BUILD_CLIENT */',()=>client).replace('/* BUILD_CORE */',()=>demo?core:'');
+for(const dir of ['deploy','demo'])fs.mkdirSync(path.join(root,dir),{recursive:true});
+fs.writeFileSync(path.join(root,'deploy','Code.gs'),core+'\n'+read('backend.gs')+'\n'+read('alerts.gs'));
+fs.writeFileSync(path.join(root,'deploy','Index.html'),fill(false));
+fs.writeFileSync(path.join(root,'demo','index.html'),fill(true));
+fs.writeFileSync(path.join(root,'deploy','appsscript.json'),JSON.stringify({timeZone:'Asia/Tokyo',runtimeVersion:'V8',dependencies:{enabledAdvancedServices:[{userSymbol:'Sheets',serviceId:'sheets',version:'v4'}]},exceptionLogging:'STACKDRIVER',oauthScopes:['https://www.googleapis.com/auth/spreadsheets','https://www.googleapis.com/auth/script.scriptapp','https://www.googleapis.com/auth/script.external_request']},null,2)+'\n');
+console.log('Apps Scriptの公開用ファイルと体験版を作成しました。');

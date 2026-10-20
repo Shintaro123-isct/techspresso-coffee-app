@@ -1,0 +1,32 @@
+name: Application checks
+
+# Start manually until the owner verifies the included Actions allowance
+# and configures a zero-spend budget. No deployment credentials are needed.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check Node.js version
+        run: node --version
+      - name: Run portable tests
+        run: npm run test:unit
+      - name: Build Apps Script baseline
+        run: npm run build
