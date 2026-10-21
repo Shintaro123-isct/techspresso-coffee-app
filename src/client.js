@@ -259,7 +259,8 @@
   try{var inputs=JSON.parse(localStorage.getItem('techspresso-inputs')||'null');if(inputs){formInputs=inputs.formInputs||{};draft=inputs.draft||{};chosenTicket=inputs.chosenTicket||'';cupSelections=inputs.cupSelections||{};returnSelections=inputs.returnSelections||{};if(person&&['cashier','handover','returns','admin','orders','display'].indexOf(inputs.tab)>=0 && ((person.role==='display'&&inputs.tab==='display')||(person.role==='admin'&&inputs.tab!=='display')||(person.role==='cashier'&&['cashier','orders','returns'].indexOf(inputs.tab)>=0)||person.role==='handover'&&['handover','orders'].indexOf(inputs.tab)>=0))tab=inputs.tab;}}catch(ignore){}
   if(cloudflare&&person&&/^\/(?:staff|legacy)(?:\.html)?\/?$/.test(window.location.pathname)){
     var hubTab=new URLSearchParams(window.location.search).get('tab');
-    if(hubTab==='returns')tab=person.role==='display'?'display':person.role==='handover'?'orders':'returns';
+    if(hubTab==='orders'&&person.role!=='display')tab='orders';
+    else if(hubTab==='returns')tab=person.role==='display'?'display':person.role==='handover'?'orders':'returns';
     else if(person.role==='admin')tab='admin';
   }
   app.addEventListener('input',rememberInputs);app.addEventListener('change',rememberInputs);app.addEventListener('click',rememberInputs);window.addEventListener('pagehide',rememberInputs);
