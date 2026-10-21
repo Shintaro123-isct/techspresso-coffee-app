@@ -21,7 +21,10 @@ for(const mode of ['development','production']){
   const ordering=read('cloudflare/ordering.html').replace('<!-- BUILD_LOGO -->',()=>logo).replace('BUILD_ENVIRONMENT',()=>title+' · '+(production?'開発用とは別の記録です。':'テスト専用 · 売上シミュレーションとは未接続')).replace('/* QR_GENERATOR */',()=>read('node_modules/qrcode-generator/dist/qrcode.js')).replace('/* QR_DECODER */',()=>read('node_modules/jsqr/dist/jsQR.js')).replace('/* ORDERING_CLIENT */',()=>client);
   fs.writeFileSync(path.join(dir,'index.html'),ordering);
   fs.writeFileSync(path.join(dir,'order.html'),ordering);
-  fs.writeFileSync(path.join(dir,'third-party-licenses.txt'),'jsQR (Apache-2.0)\n'+read('node_modules/jsqr/LICENSE')+'\nqrcode-generator (MIT)\n'+read('node_modules/qrcode-generator/dist/qrcode.js').slice(0,800));
+  fs.writeFileSync(path.join(dir,'third-party-licenses.txt'),'jsQR (Apache-2.0)\n'+read('node_modules/jsqr/LICENSE')+'\nqrcode-generator (MIT)\n'+`Copyright (c) 2009 Kazuhiko Arase
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the \"Software\"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.`);
   fs.writeFileSync(path.join(dir,'order-sw.js'),`const CACHE='techspresso-order-v1';
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.add('/order')));self.skipWaiting();});
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));

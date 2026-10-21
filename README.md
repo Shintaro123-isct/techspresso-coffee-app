@@ -46,7 +46,7 @@ Cloudflare版はスタッフ用と開発用を、別のURL・別のデータベ�
 - discord-relay/worker.mjs：現在の通知専用Worker。注文アプリの本体ではありません。
 - docs/：共同開発の設定・移行方針
 
-Node.js 22以上、外部パッケージ不要。リポジトリのフォルダーで実行：
+Node.js 22以上。Cloudflare版の開発前に `npm ci` で依存ライブラリを導入してください。リポジトリのフォルダーで実行：
 
 ```text
 npm run test:unit

@@ -5,7 +5,7 @@ const customer=/^\/order(?:\.html)?\/?$/.test(location.pathname),screen=new URLS
 const key='tc-qr-v1-',load=(k,f)=>{try{return JSON.parse(localStorage.getItem(key+k))??f;}catch{return f;}},save=(k,v)=>{try{localStorage.setItem(key+k,JSON.stringify(v));return true;}catch{return false;}};
 let draft=load(customer?'customer':'cashier',{}),qrOrder=customer?load('customerQR',null):load('scanned',null),ticket='',cash=false,person=null,snapshot=null,busy=false,pending=load('pending-'+screen,null),stream=null,scanGeneration=0,selection={},lastSuccess=0,refreshing=false,collected=false;
 const title=m=>m.displayName||m.name;
-function status(text,error=false){$('#status').textContent=text;$('#status').className=error?'notice danger':'notice';}
+function status(text,error=false){if(!error&&text.startsWith('最新の一覧')&&$('#status').dataset.keep==='true')return;$('#status').dataset.keep=String(error&&text.includes('受付済み'));$('#status').textContent=text;$('#status').className=error?'notice danger':'notice';}
 function lines(){return menu.filter(m=>Number(draft[m.id])>0).map(m=>({menuId:m.id,quantity:Number(draft[m.id])}));}
 function validated(id=crypto.randomUUID()){if(Object.values(draft).some(n=>!Number.isInteger(Number(n))||Number(n)<0||Number(n)>20))throw Error('各商品の杯数は0〜20の整数で入力してください。');return parseOrder({v:1,id,items:lines()},menu);}
 function list(items){return items.map(i=>{const m=menu.find(m=>m.id===i.menuId);return '<div class="line">'+esc(title(m))+' '+esc(m.temperature||'Iced')+' × '+i.quantity+'</div>';}).join('');}
