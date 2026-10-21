@@ -8,6 +8,40 @@ import qrcode from 'qrcode-generator';
 import jsQR from 'jsqr';
 import vm from 'node:vm';
 
+function orderingHarness({registered=false,customer=false,deferPermission=false}={}){
+ const elements=Object.fromEntries(['#scanner-slot','#status','#scan-feedback','#stop','#edit','#menu-editor','#qr'].map(k=>[k,{innerHTML:'',textContent:'',dataset:{},scrollIntoView(){}}]));
+ let stopped=0,resolveCamera;
+ const video={readyState:2,videoWidth:640,videoHeight:480,async play(){}};elements['#camera']={scrollIntoView(){}};elements['#camera video']=video;
+ const plus={dataset:{plus:'blend-hot'}},minus={dataset:{minus:'blend-hot'}},orderQR={v:1,id:crypto.randomUUID(),items:[{menuId:'blend-hot',quantity:1}]};
+ const stream={getTracks:()=>[{stop(){stopped++;}}]};
+ const context=vm.createContext({URLSearchParams,crypto,location:{pathname:customer?'/order':'/',search:''},localStorage:{getItem:()=>null,setItem(){}},setTimeout(){},
+  navigator:{mediaDevices:{getUserMedia:()=>deferPermission?new Promise(resolve=>{resolveCamera=resolve;}):Promise.resolve(stream)}},
+  document:{querySelector:s=>elements[s]||null,querySelectorAll:s=>s==='[data-plus]'?[plus]:s==='[data-minus]'?[minus]:[],createElement:()=>({getContext:()=>({drawImage(){},getImageData:()=>({data:[]})})})},
+  jsQR:()=>({data:JSON.stringify(orderQR)}),parseOrder,deliveryRequest,
+  respond:async()=>({registered,ticket:'A'}),orderQR});
+ let source=fs.readFileSync(new URL('../cloudflare/ordering-client.mjs',import.meta.url),'utf8');
+ source=source.slice(0,source.lastIndexOf('\nif(!customer){const reload')).replace(/import[^\n]+\n/,'').replace('/* BUILD_MENU */[]',JSON.stringify([{id:'blend-hot',name:'Dark Roast Blend',displayName:'ブレンド',temperature:'Hot',price:500}]));
+ vm.runInContext(source+`\napi=async()=>respond();person={token:'local-test'};globalThis.probe={startScan,stopScan,editor,bindEditor,setSelected(){qrOrder=orderQR;ticket='B';cash=true;draft={'blend-hot':1};},getState(){return {ticket,cash,qrOrder,draft,busy};}};`,context);
+ return {probe:context.probe,elements,plus,minus,stopped:()=>stopped,allowCamera:()=>resolveCamera(stream)};
+}
+
+test('カメラ: 非同期の受付済みエラーを表示し、カメラを閉じて停止する',async()=>{
+ const h=orderingHarness({registered:true});await h.probe.startScan();
+ assert.match(h.elements['#status'].textContent,/既に受け付けています/);assert.equal(h.elements['#status'].dataset.keep,'true');assert.equal(h.elements['#scanner-slot'].innerHTML,'');assert.equal(h.stopped(),1);assert.equal(h.probe.getState().busy,false);
+});
+
+test('カメラ: 同じ未確定QRの再読取は理由を表示し、選択中の札と受領チェックを保持する',async()=>{
+ const h=orderingHarness();h.probe.setSelected();await h.probe.startScan();assert.match(h.elements['#status'].textContent,/まだ確定していません/);assert.match(h.elements['#status'].textContent,/B/);assert.equal(h.probe.getState().ticket,'B');assert.equal(h.probe.getState().cash,true);
+});
+
+test('カメラ: 許可待ちの間に閉じた場合、後から許可されても映像を開かない',async()=>{
+ const h=orderingHarness({deferPermission:true}),start=h.probe.startScan();assert.match(h.elements['#scanner-slot'].innerHTML,/注文QRを読み取る/);h.probe.stopScan();h.allowCamera();await start;assert.equal(h.elements['#scanner-slot'].innerHTML,'');assert.equal(h.stopped(),1);
+});
+
+test('杯数: お客様・レジ共通の−／＋で0→1→0となり、負数や21杯には進まない',()=>{
+ for(const customer of [true,false]){const h=orderingHarness({customer});assert.doesNotMatch(h.probe.editor(),/type="number"/);h.probe.bindEditor();h.plus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],1);assert.match(h.probe.editor(),/>1杯<\/output>/);h.minus.onclick();h.minus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],0);for(let i=0;i<25;i++)h.plus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],20);}
+});
+
 test('提供画面: 1札は単独API、複数札は一括API。部分提供と回収確認を区別する',async()=>{
  const f=fixture(),cash=await f.login(),hand=await f.login('handover');const o=await order(f,cash);
  assert.throws(()=>deliveryRequest([o],{[o.id+':1']:true},false),/回収/);
