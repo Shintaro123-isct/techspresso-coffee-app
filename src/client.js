@@ -78,7 +78,7 @@
     loginForm.querySelector('[name="role"]').addEventListener('change',function(){var label=loginForm.querySelector('[data-admin-code]');if(!label)return;var isAdmin=this.value==='admin',code=label.querySelector('input');label.hidden=!isAdmin;code.disabled=!isAdmin;code.required=isAdmin;if(!isAdmin)code.value='';});
     loginForm.addEventListener('submit',async function(e){
       e.preventDefault();var form=e.currentTarget,button=form.querySelector('button');button.disabled=true;
-      try{var fields=new FormData(form);person=await call('login',[{role:fields.get('role'),code:fields.get('code')||'',roleOnly:true}]);sessionStore(person);tab=person.role==='display'?'display':person.role==='handover'?'handover':'cashier';snapshot=null;if(pending&&person.role!=='display')await sendPending();else await refresh(true);}
+      try{var fields=new FormData(form);person=await call('login',[{role:fields.get('role'),code:fields.get('code')||'',roleOnly:true}]);sessionStore(person);tab=cloudflare&&person.role==='admin'?'admin':person.role==='display'?'display':person.role==='handover'?'handover':'cashier';snapshot=null;if(pending&&person.role!=='display')await sendPending();else await refresh(true);}
       catch(error){toast(error.message,true);button.disabled=false;}
     });
   }
@@ -99,6 +99,11 @@
   }
   function render(){
     if(!person || !snapshot)return;
+    if(cloudflare&&(tab==='cashier'||tab==='handover')){
+      if(busy||pending){app.innerHTML='<div class="empty">保存状態を確認しています。完了すると現在の担当画面へ移動します。</div>';return;}
+      try{localStorage.setItem('tc-qr-v1-person-'+tab,JSON.stringify(person));}catch(ignore){}
+      window.location.replace('/?screen='+tab);return;
+    }
     identity.innerHTML='<div class="person"><div><strong>'+roleNames[person.role]+'</strong></div><button id="change-user">担当を変更</button></div>';
     document.getElementById('change-user').onclick=signOut;
     document.body.classList.toggle('display-mode',person.role==='display');
@@ -247,11 +252,16 @@
       snapshotGeneration++;
       if(role==='admin'&&person.baseRole!=='admin'&&person.role!=='admin'){close();person=null;snapshot=null;sessionStore(null);loginScreen();app.querySelector('[name="role"]').value='admin';app.querySelector('[name="role"]').dispatchEvent(new Event('change'));return;}
       dialog.querySelector('#switch-go').disabled=true;
-      try{var result=await call('rpc',[person.token,'switchRole',{role:role},'']);if(!result.ok)throw Error(result.message);person=result.person;sessionStore(person);tab=role==='display'?'display':role==='handover'?'handover':'cashier';snapshot=null;close();if(pending&&person.role!=='display')await sendPending();else await refresh(true);}catch(error){toast(error.message,true);dialog.querySelector('#switch-go').disabled=false;}
+      try{var result=await call('rpc',[person.token,cloudflare?'openRole':'switchRole',{role:role},'']);if(!result.ok)throw Error(result.message);person=result.person;sessionStore(person);tab=cloudflare&&role==='admin'?'admin':role==='display'?'display':role==='handover'?'handover':'cashier';snapshot=null;close();if(pending&&person.role!=='display')await sendPending();else await refresh(true);}catch(error){toast(error.message,true);dialog.querySelector('#switch-go').disabled=false;}
     };dialog.showModal();
   }
   try{pending=JSON.parse(localStorage.getItem('techspresso-pending')||'null');var saved=JSON.parse(localStorage.getItem('techspresso-session')||'null');if(saved&&(saved.expiresAt>Date.now()||saved.role==='display')){person=saved;if(demo)demoTokens[saved.token]=saved;tab=saved.role==='display'?'display':saved.role==='handover'?'handover':'cashier';}}catch(ignore){}
   try{var inputs=JSON.parse(localStorage.getItem('techspresso-inputs')||'null');if(inputs){formInputs=inputs.formInputs||{};draft=inputs.draft||{};chosenTicket=inputs.chosenTicket||'';cupSelections=inputs.cupSelections||{};returnSelections=inputs.returnSelections||{};if(person&&['cashier','handover','returns','admin','orders','display'].indexOf(inputs.tab)>=0 && ((person.role==='display'&&inputs.tab==='display')||(person.role==='admin'&&inputs.tab!=='display')||(person.role==='cashier'&&['cashier','orders','returns'].indexOf(inputs.tab)>=0)||person.role==='handover'&&['handover','orders'].indexOf(inputs.tab)>=0))tab=inputs.tab;}}catch(ignore){}
+  if(cloudflare&&person&&/^\/(?:staff|legacy)(?:\.html)?\/?$/.test(window.location.pathname)){
+    var hubTab=new URLSearchParams(window.location.search).get('tab');
+    if(hubTab==='returns')tab=person.role==='display'?'display':person.role==='handover'?'orders':'returns';
+    else if(person.role==='admin')tab='admin';
+  }
   app.addEventListener('input',rememberInputs);app.addEventListener('change',rememberInputs);app.addEventListener('click',rememberInputs);window.addEventListener('pagehide',rememberInputs);
   if(person){app.innerHTML='<div class="empty">注文を読み込んでいます…</div>';if(pending&&person.role!=='display')sendPending();else refresh(true);}else loginScreen();
   setInterval(function(){refresh(false);},15000);

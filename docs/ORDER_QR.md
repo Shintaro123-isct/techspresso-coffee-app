@@ -11,7 +11,7 @@
 - お客様: https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/order
 - レジ: https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/?screen=cashier
 - 提供: https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/?screen=handover
-- 既存の管理・取消・表示専用: 同じ開発URLの `/legacy`。既存機能を保持。
+- 既存の管理・取消・表示専用: 同じ開発URLの `/staff`。既存機能を保持。
 
 ## 運用
 
@@ -40,3 +40,5 @@ QRには `v:1`、ランダムUUIDの `id`、`items:[{menuId,quantity}]` のみ�
 `npm test`、`npm run deploy:dev`。GitHub mainへのマージだけではURLは更新されない。スタッフ用への反映は明示的な指示後のみ。
 
 実端末ではiPhone Safari / Android Chromeのカメラ許可・ピント・低照度・画面の反射、機内モードで一度開いた注文画面の再表示、実物札・紙への切替訓練、複数端末での反映を確認する。今回のPCテストはQR画像読取・API同時実行・原子的保存を対象とし、実カメラの光学条件を保証しない。
+
+担当・管理・札返却は `/staff?tab=returns` に統一。会計・提供の選択は現在の `/?screen=cashier`・`/?screen=handover`へ移動し、同じセッションと記録を使用します。旧 `/legacy` は管理画面へ転送する互換入口です。保存結果が不明な間は担当画面を移しません。

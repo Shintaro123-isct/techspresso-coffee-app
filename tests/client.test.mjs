@@ -10,7 +10,7 @@ function fixture(options={}){
   source=source.slice(0,source.indexOf('  try{pending=JSON.parse'))+`
     testHooks.ui={configure:function(p,s){person=p;snapshot=s;lastSynced=Date.now();tab='handover';},setMutate:function(fn){mutate=fn;},setSelections:function(value){cupSelections=value;},selectedDeliveries:selectedDeliveries,updateBatchDelivery:updateBatchDelivery,renderDisplay:renderDisplay,renderReturns:renderReturns,updateWarnings:updateWarnings,renderOrders:renderOrders,render:render,remember:rememberInputs,sessionStore:sessionStore,pendingStore:pendingStore,setPending:function(p){pending=p;busy=!!p;},getSelections:function(){return cupSelections;},setTab:function(t){tab=t;},setCall:function(fn){call=fn;},refresh:refresh,mutate:mutate,getSnapshot:function(){return snapshot;},getPerson:function(){return person;}};
   }());`;
-  const ctx=vm.createContext({testHooks:{},crypto:{randomUUID:()=> '00000000-0000-4000-8000-000000000001'},google:{script:{run:{}}},document:{getElementById:node,body:{classList:{toggle(){},remove(){}},appendChild(){}},createElement(){if(options.makeDialog)return options.makeDialog(handlers);const parts={p:{style:{}},'[data-no]':{},'[data-yes]':{}};return {className:'',innerHTML:'',querySelector:q=>parts[q],close(){},remove(){},showModal(){handlers.confirmText=parts.p.textContent;Promise.resolve().then(()=>parts[options.confirmBatch?'[data-yes]':'[data-no]'].onclick());}};}},localStorage:{setItem:(k,v)=>storage.set(k,v),getItem:k=>storage.get(k)||null,removeItem:k=>storage.delete(k)},Date:options.Date||Date,console,setTimeout:()=>0,clearTimeout(){}});
+  const ctx=vm.createContext({...(options.cloudflare?{window:{TECHSPRESSO_CLOUDFLARE:true,location:{replace:url=>{handlers.redirect=url;}}}}:{}),testHooks:{},crypto:{randomUUID:()=> '00000000-0000-4000-8000-000000000001'},google:{script:{run:{}}},document:{getElementById:node,body:{classList:{toggle(){},remove(){}},appendChild(){}},createElement(){if(options.makeDialog)return options.makeDialog(handlers);const parts={p:{style:{}},'[data-no]':{},'[data-yes]':{}};return {className:'',innerHTML:'',querySelector:q=>parts[q],close(){},remove(){},showModal(){handlers.confirmText=parts.p.textContent;Promise.resolve().then(()=>parts[options.confirmBatch?'[data-yes]':'[data-no]'].onclick());}};}},localStorage:{setItem:(k,v)=>storage.set(k,v),getItem:k=>storage.get(k)||null,removeItem:k=>storage.delete(k)},Date:options.Date||Date,console,setTimeout:()=>0,clearTimeout(){}});
   vm.runInContext(source,ctx);
   return {ui:ctx.testHooks.ui,storage,node,cards,buttons,handlers};
 }
@@ -217,4 +217,13 @@ test('受け渡しは未提供を受付順で先に置き、提供済み返却�
  f.ui.renderOrders();const html=f.node('workspace').innerHTML;
  const pos=id=>html.indexOf('data-order="'+id+'"');assert.ok(pos('early')<pos('later'));assert.ok(pos('later')<pos('done'));assert.equal(pos('cancel'),-1);
  f.ui.setSelections({early:{revision:1,numbers:[1],collect:true},later:{revision:1,numbers:[1],collect:true}});f.ui.updateBatchDelivery();assert.equal(f.node('batch-deliver').textContent,'選択した2札・計2杯を提供完了');assert.match(html,/batch-delivery-bar/);
+});
+
+
+test('Cloudflare管理: 会計・提供を選ぶと現在の画面へ移り、セッションを引き継ぐ',()=>{
+ for(const target of ['cashier','handover']){const f=fixture({cloudflare:true}),person={role:'admin',baseRole:'admin',token:'local-session',expiresAt:Date.now()+60000};f.ui.configure(person,{state:{}});f.ui.setTab(target);f.ui.render();assert.equal(f.handlers.redirect,'/?screen='+target);assert.equal(JSON.parse(f.storage.get('tc-qr-v1-person-'+target)).token,'local-session');assert.doesNotMatch(f.node('app').innerHTML,/menu-item|data-deliver/);}
+});
+
+test('Cloudflare管理: 保存結果が不明な間は古い注文画面や別担当へ進めない',()=>{
+ const f=fixture({cloudflare:true});f.ui.configure({role:'cashier'},{state:{}});f.ui.setTab('cashier');f.ui.setPending({action:'createOrder'});f.ui.render();assert.equal(f.handlers.redirect,undefined);assert.match(f.node('app').innerHTML,/保存状態を確認/);
 });
