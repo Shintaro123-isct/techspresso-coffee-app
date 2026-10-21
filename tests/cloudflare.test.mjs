@@ -20,7 +20,7 @@ function orderingHarness({registered=false,customer=false,deferPermission=false}
   jsQR:()=>({data:JSON.stringify(orderQR)}),parseOrder,deliveryRequest,
   respond:async()=>({registered,ticket:'A'}),orderQR});
  let source=fs.readFileSync(new URL('../cloudflare/ordering-client.mjs',import.meta.url),'utf8');
- source=source.slice(0,source.lastIndexOf('\nif(!customer){const reload')).replace(/import[^\n]+\n/,'').replace('/* BUILD_MENU */[]',JSON.stringify([{id:'blend-hot',name:'Dark Roast Blend',displayName:'ブレンド',temperature:'Hot',price:500}]));
+ source=source.slice(0,source.lastIndexOf('\nif(!customer){')).replace(/import[^\n]+\n/,'').replace('/* BUILD_MENU */[]',JSON.stringify([{id:'blend-hot',name:'Dark Roast Blend',displayName:'ブレンド',temperature:'Hot',price:500}]));
  vm.runInContext(source+`\napi=async()=>respond();person={token:'local-test'};globalThis.probe={startScan,stopScan,editor,bindEditor,newCustomerOrder,validated,setSelected(){qrOrder=orderQR;ticket='B';cash=true;draft={'blend-hot':1};},getState(){return {ticket,cash,qrOrder,draft,busy};}};`,context);
  return {probe:context.probe,elements,plus,minus,stopped:()=>stopped,allowCamera:()=>resolveCamera(stream)};
 }
@@ -118,6 +118,21 @@ function fixture(){
   return {env,sql,api,login,rpc,orders:()=>sql.prepare('SELECT * FROM orders').all(),events:()=>sql.prepare('SELECT * FROM events').all()};
 }
 const item=[{menuId:'blend-hot',quantity:1}];
+test('担当切替: 別セッションへ切り替え、他タブの会計権限と管理者認証を壊さない',async()=>{
+ const f=fixture(),cash=await f.login(),changed=await f.rpc(cash,'openRole',{role:'handover'});
+ assert.equal(changed.ok,true);assert.notEqual(changed.person.token,cash.token);assert.equal(changed.person.role,'handover');
+ assert.equal((await f.rpc(cash,'createOrder',{ticket:'A',items:item})).ok,true);
+ assert.equal((await f.rpc(changed.person,'createOrder',{ticket:'B',items:item})).ok,false);
+ assert.equal((await f.rpc(cash,'openRole',{role:'admin'})).ok,false);
+ const admin=await f.login('admin',f.env.ADMIN_CODE),next=await f.rpc(admin,'openRole',{role:'cashier'});assert.equal(next.person.baseRole,'admin');
+ assert.equal((await f.rpc(next.person,'openRole',{role:'admin'})).person.role,'admin');
+});
+
+test('担当入口: 管理ページの会計・提供は現行UIへ、旧URLは管理入口へ転送する',()=>{
+ const base=new URL('../.cloudflare-build/public-development/',import.meta.url),old=fs.readFileSync(new URL('legacy.html',base),'utf8'),staff=fs.readFileSync(new URL('staff.html',base),'utf8'),current=fs.readFileSync(new URL('index.html',base),'utf8');
+ assert.match(old,/url=\/staff\?tab=returns/);assert.doesNotMatch(old,/renderCashier|create-order/);
+ assert.match(staff,/window.location.replace\('\/\?screen='\+tab\)/);assert.match(current,/href="\/staff\?tab=returns"/);assert.doesNotMatch(current,/href="\/legacy/);
+});
 const order=async(f,cash,ticket='A')=>{const r=await f.rpc(cash,'createOrder',{ticket,items:item});assert.equal(r.ok,true,JSON.stringify(r));return r.snapshot.state.orders.find(o=>o.ticket===ticket);};
 
 test('Cloudflare: コードなし担当・管理者認証・表示専用の権限をサーバーで検証',async()=>{

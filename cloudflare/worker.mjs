@@ -111,7 +111,7 @@ export async function mutate(env,auth,action,payload,requestId){
 }
 async function rpc(env,args){
   const [token,action,payload={},requestId]=args,auth=await session(env,token),person=auth.person;
-  if(person.role==='display'&&action!=='snapshot'&&action!=='switchRole')fail('表示専用では記録や設定を変更できません。');
+  if(person.role==='display'&&!['snapshot','switchRole','openRole'].includes(action))fail('表示専用では記録や設定を変更できません。');
   if(action==='snapshot')return snapshot(env,person);
   if(action==='checkOrderQR'){
     if(!['cashier','admin'].includes(person.role))fail('レジ担当だけが確認できます。');
@@ -123,6 +123,11 @@ async function rpc(env,args){
   if(action==='switchRole'){
     if(!names[payload.role]||(payload.role==='admin'&&person.baseRole!=='admin'))fail('管理者は管理者用コードでログインしてください。');
     const next={...person,role:payload.role,name:names[payload.role],expiresAt:now()+ttl};await saveSession(env,auth.key,next);return {ok:true,person:publicPerson(token,next)};
+  }
+  if(action==='openRole'){
+    if(!names[payload.role]||(payload.role==='admin'&&person.baseRole!=='admin'))fail('管理者は管理者用コードでログインしてください。');
+    const token=uuid()+uuid(),next={...person,role:payload.role,name:names[payload.role],expiresAt:now()+ttl};
+    await saveSession(env,await digest(token),next,true);return {ok:true,person:publicPerson(token,next)};
   }
   if(action==='setWaitThreshold'){
     if(person.role!=='admin')fail('管理者だけが操作できます。');
