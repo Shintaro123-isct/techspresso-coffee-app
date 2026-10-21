@@ -30,7 +30,14 @@ function newCustomerOrder(){
 }
 function showQR(){try{const p=parseOrder(qrOrder,menu),code=qrcode(0,'M');code.addData(JSON.stringify({v:1,id:p.id,items:p.items}));code.make();$('#qr').hidden=false;$('#qr').innerHTML='<h2>レジでこのQRを提示</h2>'+code.createSvgTag({cellSize:5,margin:4,scalable:true})+list(p.items)+'<p>現在のメニューで '+p.total.toLocaleString()+'円（現金）</p><p class="muted">注文ID '+esc(p.id)+'<br>同じQRは1回だけ受付できます。</p><button id="new-customer-order" class="primary">新しい注文を作る</button><p class="muted">商品選択をリセットして、別の注文QRを作れます。受付済みの注文はそのまま残ります。</p>';$('#new-customer-order').onclick=newCustomerOrder;$('#qr').scrollIntoView({behavior:'smooth'});}catch{qrOrder=null;save('customerQR',null);}}
 async function api(method,args){const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);try{const r=await fetch('/api/'+method,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({args}),signal:controller.signal});const data=await r.json();if(data.ok===false)throw Object.assign(Error(data.message),{safe:!data.uncertain,expired:data.sessionExpired});if(!r.ok)throw Error('通信を確認してください。');return data;}finally{clearTimeout(timer);}}
-async function login(){const old=load('person-'+screen,null);if(old?.expiresAt>Date.now())person=old;else{person=await api('login',[{role:screen}]);save('person-'+screen,person);}await refresh();}
+async function login(){
+ const old=load('person-'+screen,null);
+ if(old?.expiresAt>Date.now()){
+  try{person=(await api('rpc',[old.token,'openRole',{role:screen}])).person;}
+  catch(e){if(!e.expired)throw e;person=await api('login',[{role:screen}]);}
+ }else person=await api('login',[{role:screen}]);
+ save('person-'+screen,person);await refresh();
+}
 async function refresh(){if(refreshing||busy)return;refreshing=true;try{const next=await api('rpc',[person.token,'snapshot']);if(!snapshot||next.state.version>=snapshot.state.version)snapshot=next;lastSuccess=Date.now();if(pending)await reconcile();if(screen==='cashier'&&!$('#receipt'))cashierRender();if(screen==='cashier')updateReceipt();else handoverRender();status('最新の一覧を取得しました（'+new Date().toLocaleTimeString('ja-JP')+'）');}catch(e){if(e.expired){person=null;save('person-'+screen,null);}status('更新できません。古い一覧です。新規登録前に接続を確認してください。 '+e.message,true);}finally{refreshing=false;}}
 function cashierRender(){
  $('#content').innerHTML='<h2>レジ · 会計</h2><section class="panel"><button id="scan" class="primary">注文QRをカメラで読み取る</button> <button id="manual">手入力に切り替え</button></section><div class="cashier-grid"><div id="edit"></div><section id="receipt" class="panel cashier-receipt"></section></div>';
