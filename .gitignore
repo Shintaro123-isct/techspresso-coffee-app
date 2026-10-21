@@ -13,10 +13,14 @@
 !/docs/CLOUDFLARE_MIGRATION.md
 !/docs/GITHUB_SETUP.md
 !/docs/CLOUDFLARE_SETUP.md
+!/docs/ORDER_QR.md
 !/cloudflare/
 /cloudflare/*
 !/cloudflare/worker.mjs
 !/cloudflare/build.mjs
+!/cloudflare/order-qr.mjs
+!/cloudflare/ordering.html
+!/cloudflare/ordering-client.mjs
 !/cloudflare/migrations/
 !/wrangler.jsonc
 !/src/

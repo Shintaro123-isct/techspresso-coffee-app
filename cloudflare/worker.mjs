@@ -1,4 +1,5 @@
 import core from '../.cloudflare-build/core.mjs';
+import {parseOrder} from './order-qr.mjs';
 
 const names={cashier:'会計担当',handover:'受け渡し担当',display:'表示専用',admin:'管理者'};
 const ttl=2*60*60*1000;
@@ -72,6 +73,13 @@ async function repeated(env,requestId,signature,person){
   return {ok:true,repeated:true,snapshot:await snapshot(env,person)};
 }
 export async function mutate(env,auth,action,payload,requestId){
+  let receipt;
+  if(action==='createOrder'){
+    try { receipt=parseOrder(payload.qr||{v:1,id:uuid(),items:payload.items},core.menu); }
+    catch(error){fail(error.message);}
+    if(payload.qr)requestId=receipt.id;
+    payload={ticket:payload.ticket,items:receipt.items};
+  }
   if(typeof requestId!=='string'||!/^[a-zA-Z0-9-]{16,80}$/.test(requestId))fail('操作IDが不正です。画面を開き直してください。');
   // Check authorization before replay lookup so a display-only caller cannot replay a write.
   const allowed={cashier:['createOrder','returnTickets','cancelOrder'],handover:['deliver','deliverBatch','collectTicket'],display:[],admin:['createOrder','returnTickets','cancelOrder','deliver','deliverBatch','collectTicket','addTickets','setTicketActive']};
@@ -83,6 +91,7 @@ export async function mutate(env,auth,action,payload,requestId){
     let event;try{event=core.prepare(value,auth.person.role,action,payload,{id:uuid(),requestId,at:new Date().toISOString(),actor:auth.person.name});}
     catch(error){const again=await repeated(env,requestId,signature,auth.person);if(again)return again;throw error;}
     core.apply(value,event);const changed=changedOrders(value,event);
+    if(receipt)for(const order of changed){order.total=receipt.total;order.payment='cash';order.customerOrderId=requestId;}
     // Keep only circulating orders in the frequently read row; history is independently indexed.
     value.orders=value.orders.filter(o=>!o.returnedAt);value.requestIds=[];
     const raw=JSON.stringify(value);if(new TextEncoder().encode(raw).length>1500000)fail('対応中の注文が多いため保存できません。管理者へ連絡してください。');
@@ -104,6 +113,13 @@ async function rpc(env,args){
   const [token,action,payload={},requestId]=args,auth=await session(env,token),person=auth.person;
   if(person.role==='display'&&action!=='snapshot'&&action!=='switchRole')fail('表示専用では記録や設定を変更できません。');
   if(action==='snapshot')return snapshot(env,person);
+  if(action==='checkOrderQR'){
+    if(!['cashier','admin'].includes(person.role))fail('レジ担当だけが確認できます。');
+    let qr;try{qr=parseOrder(payload.qr,core.menu);}catch(error){fail(error.message);}
+    const row=await stmt(env,'SELECT event FROM events WHERE request_id=?',qr.id).first();
+    if(row){const event=JSON.parse(row.event);return {ok:true,registered:true,ticket:event.data.ticket||'',at:event.at};}
+    return {ok:true,registered:false,total:qr.total};
+  }
   if(action==='switchRole'){
     if(!names[payload.role]||(payload.role==='admin'&&person.baseRole!=='admin'))fail('管理者は管理者用コードでログインしてください。');
     const next={...person,role:payload.role,name:names[payload.role],expiresAt:now()+ttl};await saveSession(env,auth.key,next);return {ok:true,person:publicPerson(token,next)};

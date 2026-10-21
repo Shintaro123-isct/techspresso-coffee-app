@@ -3,6 +3,68 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {DatabaseSync} from 'node:sqlite';
 import {handle,digest} from '../cloudflare/worker.mjs';
+import {parseOrder,deliveryRequest} from '../cloudflare/order-qr.mjs';
+import qrcode from 'qrcode-generator';
+import jsQR from 'jsqr';
+import vm from 'node:vm';
+
+test('提供画面: 1札は単独API、複数札は一括API。部分提供と回収確認を区別する',async()=>{
+ const f=fixture(),cash=await f.login(),hand=await f.login('handover');const o=await order(f,cash);
+ assert.throws(()=>deliveryRequest([o],{[o.id+':1']:true},false),/回収/);
+ const p=deliveryRequest([o],{[o.id+':1']:true},true);assert.equal(p.action,'deliver');assert.equal((await f.rpc(hand,p.action,p.payload)).ok,true);
+ assert.equal((await f.rpc(cash,'returnTickets',{labels:['A'],orderIds:{A:o.id}})).ok,true);
+ const a=await order(f,cash),b=await order(f,cash,'B'),both={[a.id+':1']:true,[b.id+':1']:true};
+ const batch=deliveryRequest([a,b],both,true);assert.equal(batch.action,'deliverBatch');assert.equal((await f.rpc(hand,batch.action,batch.payload)).ok,true);
+ assert.equal(deliveryRequest([{id:'partial',revision:1,items:[{number:1},{number:2}]}],{'partial:1':true},false).payload.collectTicket,false);
+});
+
+test('注文ページ: オフライン時は公開ページだけを復元し、注文APIとスタッフ一覧はキャッシュしない',async()=>{
+ const listeners={},cache=new Map(),tasks=[];let online=true;
+ vm.runInNewContext(fs.readFileSync(new URL('../.cloudflare-build/public-development/order-sw.js',import.meta.url),'utf8'),{
+  URL,self:{location:{origin:'https://coffee.example'},skipWaiting(){},clients:{claim(){}},addEventListener(k,fn){listeners[k]=fn;}},
+  caches:{async open(){return {async add(url){cache.set(url,new Response('offline order page'));},async put(url,response){cache.set(url,response);}};},async match(url){return cache.get(url);}},
+  fetch:async()=>{if(!online)throw Error('offline');return new Response('live order page');}
+ });
+ listeners.install({waitUntil:p=>tasks.push(p)});await Promise.all(tasks);online=false;
+ let result;listeners.fetch({request:new Request('https://coffee.example/order'),respondWith:p=>{result=p;},waitUntil:p=>tasks.push(p)});assert.equal(await(await result).text(),'offline order page');
+ for(const path of ['/api/rpc','/','/legacy']){let intercepted=false;listeners.fetch({request:new Request('https://coffee.example'+path),respondWith(){intercepted=true;}});assert.equal(intercepted,false);}
+});
+
+test('注文QR: 実際に生成した画像から商品・個数・注文識別番号だけを復号できる',()=>{
+ const data={v:1,id:crypto.randomUUID(),items:[{menuId:'blend-iced',quantity:2}]},qr=qrcode(0,'M');qr.addData(JSON.stringify(data));qr.make();
+ const size=qr.getModuleCount(),scale=5,width=(size+8)*scale,pixels=new Uint8ClampedArray(width*width*4).fill(255);
+ for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(qr.isDark(r,c))for(let y=0;y<scale;y++)for(let x=0;x<scale;x++){const i=(((r+4)*scale+y)*width+(c+4)*scale+x)*4;pixels[i]=pixels[i+1]=pixels[i+2]=0;}
+ assert.deepEqual(JSON.parse(jsQR(pixels,width,width).data),data);
+});
+
+test('注文QR: 数量・不明商品・重複商品・不正IDを拒否し、価格は登録メニューから計算',()=>{
+ const menu=[{id:'a',price:600}],base={v:1,id:crypto.randomUUID(),items:[{menuId:'a',quantity:2,price:1}]};assert.equal(parseOrder({...base,price:1},menu).total,1200);
+ for(const items of [[{menuId:'b',quantity:1}],[{menuId:'a',quantity:0}],[{menuId:'a',quantity:1.5}],[{menuId:'a',quantity:21}],[{menuId:'a',quantity:1},{menuId:'a',quantity:1}],[]])assert.throws(()=>parseOrder({...base,items},menu));
+ assert.throws(()=>parseOrder({...base,id:'x'},menu));assert.throws(()=>parseOrder('x'.repeat(2001),menu));
+});
+
+test('注文QR: 別レジ・別札で同時読取しても1件だけ登録、返却後や取消後も再受付しない',async()=>{
+ const f=fixture(),a=await f.login(),b=await f.login(),qr={v:1,id:crypto.randomUUID(),items:item};
+ const rs=await Promise.all([f.rpc(a,'createOrder',{ticket:'A',qr,price:1}),f.rpc(b,'createOrder',{ticket:'B',qr,price:1})]);assert.equal(rs.filter(r=>r.ok).length,1);assert.equal(f.orders().length,1);
+ const order=JSON.parse(f.orders()[0].data);assert.equal(order.total,500);assert.equal(order.payment,'cash');
+ await f.rpc(a,'cancelOrder',{orderId:order.id,revision:1,ticketAtCashier:true});assert.equal((await f.rpc(b,'createOrder',{ticket:'C',qr})).ok,false);assert.equal(f.orders().length,1);
+ // A new customer with an identical basket gets a different identifier.
+ assert.equal((await f.rpc(a,'createOrder',{ticket:'C',qr:{...qr,id:crypto.randomUUID()}})).ok,true);
+});
+
+test('注文QR: 通信切断の再送は1件だけで、価格や個数の改ざんを受け付けない',async()=>{
+ const f=fixture(),cash=await f.login(),qr={v:1,id:crypto.randomUUID(),items:item},payload={ticket:'A',qr};
+ const first=await f.rpc(cash,'createOrder',payload);assert.equal(first.ok,true);const retry=await f.rpc(cash,'createOrder',payload);assert.equal(retry.repeated,true);assert.equal(f.orders().length,1);
+ assert.equal((await f.rpc(cash,'createOrder',{ticket:'A',qr:{...qr,items:[{menuId:'blend-hot',quantity:2}]}})).ok,false);assert.equal(f.orders().length,1);
+});
+
+test('注文QR: 現金受領前に受付済みを確認でき、提供・返却後も受付済みのまま',async()=>{
+ const f=fixture(),cash=await f.login(),display=await f.login('display'),qr={v:1,id:crypto.randomUUID(),items:item};
+ assert.equal((await f.rpc(cash,'checkOrderQR',{qr})).registered,false);
+ const r=await f.rpc(cash,'createOrder',{ticket:'A',qr}),o=r.snapshot.state.orders[0];
+ assert.equal((await f.rpc(cash,'checkOrderQR',{qr})).ticket,'A');assert.equal((await f.rpc(display,'checkOrderQR',{qr})).ok,false);
+ await f.rpc(cash,'cancelOrder',{orderId:o.id,revision:1,ticketAtCashier:true});assert.equal((await f.rpc(cash,'checkOrderQR',{qr})).registered,true);
+});
 
 function fixture(){
   const sql=new DatabaseSync(':memory:');sql.exec(fs.readFileSync(new URL('../cloudflare/migrations/0001_initial.sql',import.meta.url),'utf8'));
