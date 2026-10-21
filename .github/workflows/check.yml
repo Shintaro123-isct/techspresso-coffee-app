@@ -26,7 +26,9 @@ jobs:
           package-manager-cache: false
       - name: Check Node.js version
         run: node --version
-      - name: Run portable tests
-        run: npm run test:unit
+      - name: Install pinned development tools without install scripts
+        run: npm ci --ignore-scripts
+      - name: Run application and Cloudflare database tests
+        run: npm test
       - name: Build Apps Script baseline
         run: npm run build
