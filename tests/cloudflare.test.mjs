@@ -10,20 +10,20 @@ import vm from 'node:vm';
 
 function orderingHarness({registered=false,customer=false,deferPermission=false}={}){
  const elements=Object.fromEntries(['#scanner-slot','#status','#scan-feedback','#stop','#edit','#menu-editor','#qr','#customer-total','#customer-count','#content','#make'].map(k=>[k,{innerHTML:'',textContent:'',dataset:{},scrollIntoView(){}}]));
- let stopped=0,resolveCamera;
+ let stopped=0,resolveCamera;const staffLink={},stored={};
  const video={readyState:2,videoWidth:640,videoHeight:480,async play(){}};elements['#camera']={scrollIntoView(){}};elements['#camera video']=video;
  const plus={dataset:{plus:'blend-hot'}},minus={dataset:{minus:'blend-hot'}},orderQR={v:1,id:crypto.randomUUID(),items:[{menuId:'blend-hot',quantity:1}]};
  const parts=Object.fromEntries(['[name="role"]','[name="code"]','[type="submit"]','[data-error]','[data-code]','[data-cancel]','form','[data-logout]'].map(k=>[k,{value:'',hidden:true,disabled:false}]));const dialog={querySelector:k=>parts[k],close(){},remove(){},showModal(){}};let destination='';
  const stream={getTracks:()=>[{stop(){stopped++;}}]};
- const context=vm.createContext({URLSearchParams,crypto,location:{pathname:customer?'/order':'/',search:''},localStorage:{getItem:()=>null,setItem(){}},setTimeout(){},
+ const context=vm.createContext({URLSearchParams,crypto,location:{pathname:customer?'/order':'/',search:''},localStorage:{getItem:()=>null,setItem(k,v){stored[k]=v;}},setTimeout(){},
   navigator:{mediaDevices:{getUserMedia:()=>deferPermission?new Promise(resolve=>{resolveCamera=resolve;}):Promise.resolve(stream)}},
-  window:{location:{assign:url=>{destination=url;}}},document:{body:{appendChild(){}},querySelector:s=>elements[s]||null,querySelectorAll:s=>s==='[data-plus]'?[plus]:s==='[data-minus]'?[minus]:[],createElement:tag=>tag==='dialog'?dialog:({getContext:()=>({drawImage(){},getImageData:()=>({data:[]})})})},
+  window:{location:{assign:url=>{destination=url;}}},document:{body:{appendChild(){}},querySelector:s=>elements[s]||null,querySelectorAll:s=>s==='[data-plus]'?[plus]:s==='[data-minus]'?[minus]:s==='[data-staff-page]'?[staffLink]:[],createElement:tag=>tag==='dialog'?dialog:({getContext:()=>({drawImage(){},getImageData:()=>({data:[]})})})},
   jsQR:()=>({data:JSON.stringify(orderQR)}),parseOrder,deliveryRequest,
   respond:async()=>({registered,ticket:'A'}),orderQR});
  let source=fs.readFileSync(new URL('../cloudflare/ordering-client.mjs',import.meta.url),'utf8');
  source=source.slice(0,source.lastIndexOf('\nif(!customer){')).replace(/import[^\n]+\n/,'').replace('/* BUILD_MENU */[]',JSON.stringify([{id:'blend-hot',name:'Dark Roast Blend',displayName:'ブレンド',temperature:'Hot',price:500}]));
- vm.runInContext(source+`\napi=async()=>respond();person={token:'local-test'};globalThis.probe={startScan,stopScan,editor,bindEditor,newCustomerOrder,validated,changeRole,setCall(fn){api=fn;},setPending(value){pending=value;},setSelected(){qrOrder=orderQR;ticket='B';cash=true;draft={'blend-hot':1};},getState(){return {ticket,cash,qrOrder,draft,busy};}};`,context);
- return {probe:context.probe,elements,parts,destination:()=>destination,plus,minus,stopped:()=>stopped,allowCamera:()=>resolveCamera(stream)};
+ vm.runInContext(source+`\napi=async()=>respond();person={token:'local-test'};globalThis.probe={startScan,stopScan,editor,bindEditor,newCustomerOrder,validated,changeRole,bindStaffPages,setCall(fn){api=fn;},setPending(value){pending=value;},setSelected(){qrOrder=orderQR;ticket='B';cash=true;draft={'blend-hot':1};},getState(){return {ticket,cash,qrOrder,draft,busy};}};`,context);
+ return {probe:context.probe,elements,parts,staffLink,stored,destination:()=>destination,plus,minus,stopped:()=>stopped,allowCamera:()=>resolveCamera(stream)};
 }
 
 test('カメラ: 非同期の受付済みエラーを表示し、カメラを閉じて停止する',async()=>{
@@ -243,4 +243,13 @@ test('担当ダイアログ: 一般から管理者を選ぶとコードを求め
  h.parts['[name="role"]'].value='admin';h.parts['[name="role"]'].onchange();assert.equal(h.parts['[data-code]'].hidden,false);assert.equal(h.parts['[name="code"]'].required,true);
  h.parts['[name="code"]'].value='local-test-only-not-a-real-code';await h.parts.form.onsubmit({preventDefault(){}});
  assert.equal(calls[0].method,'login');assert.equal(h.parts['[name="code"]'].value,'');assert.equal(h.destination(),'/staff?tab=admin');
+});
+
+
+test('操作タブ: 保存結果が不明な間は移動せず、通常時は同じ担当を管理画面へ引き継ぐ',()=>{
+ const h=orderingHarness();h.probe.bindStaffPages();let prevented=false;
+ h.probe.setPending({action:'createOrder'});h.staffLink.onclick({preventDefault(){prevented=true;}});
+ assert.equal(prevented,true);assert.equal(h.stored['techspresso-session'],undefined);
+ h.probe.setPending(null);prevented=false;h.staffLink.onclick({preventDefault(){prevented=true;}});
+ assert.equal(prevented,false);assert.equal(JSON.parse(h.stored['techspresso-session']).token,'local-test');
 });
