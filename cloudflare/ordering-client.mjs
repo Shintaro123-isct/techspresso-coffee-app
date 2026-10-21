@@ -5,6 +5,28 @@ const customer=/^\/order(?:\.html)?\/?$/.test(location.pathname),screen=new URLS
 const key='tc-qr-v1-',load=(k,f)=>{try{return JSON.parse(localStorage.getItem(key+k))??f;}catch{return f;}},save=(k,v)=>{try{localStorage.setItem(key+k,JSON.stringify(v));return true;}catch{return false;}};
 let draft=load(customer?'customer':'cashier',{}),qrOrder=customer?load('customerQR',null):load('scanned',null),ticket='',cash=false,person=null,snapshot=null,busy=false,pending=load('pending-'+screen,null),stream=null,scanGeneration=0,selection={},lastSuccess=0,refreshing=false,collected=false;
 const title=m=>m.displayName||m.name;
+const roleNames={cashier:'会計担当',handover:'受け渡し担当',display:'表示専用（タブレット表示）',admin:'管理者'};
+function updateRoleLabel(){if($('#staff-role'))$('#staff-role').textContent=person?.baseRole==='admin'?'管理者 · '+roleNames[screen]:roleNames[screen];}
+function changeRole(){
+ if(busy||pending){status('保存完了後に担当を変更してください。',true);return;}
+ stopScan();const dialog=document.createElement('dialog');dialog.className='role-dialog';
+ dialog.innerHTML='<h2>担当を変更</h2><form><label>担当<select name="role">'+Object.entries(roleNames).map(([role,name])=>'<option value="'+role+'">'+name+'</option>').join('')+'</select></label><label data-code hidden>管理者の利用コード<input name="code" type="password" autocomplete="off" disabled></label><p class="muted">管理者は管理者用コードでの認証が必要です。</p><p data-error class="danger" role="alert" hidden></p><div class="role-actions"><button type="button" data-cancel>戻る</button><button type="submit" class="primary">変更する</button></div></form><button type="button" data-logout>ログインを終了する</button>';
+ document.body.appendChild(dialog);const select=dialog.querySelector('[name="role"]'),code=dialog.querySelector('[name="code"]'),submit=dialog.querySelector('[type="submit"]'),error=dialog.querySelector('[data-error]');select.value=screen;
+ function close(){code.value='';dialog.close();dialog.remove();}
+ select.onchange=()=>{const needsCode=select.value==='admin'&&person?.baseRole!=='admin';dialog.querySelector('[data-code]').hidden=!needsCode;code.disabled=!needsCode;code.required=needsCode;if(!needsCode)code.value='';error.hidden=true;};
+ dialog.querySelector('[data-cancel]').onclick=close;dialog.oncancel=e=>{e.preventDefault();close();};
+ dialog.querySelector('form').onsubmit=async e=>{
+  e.preventDefault();const role=select.value;submit.disabled=true;error.hidden=true;
+  try{
+   const next=role==='admin'&&person?.baseRole!=='admin'?await api('login',[{role,code:code.value}]):person?(await api('rpc',[person.token,'openRole',{role}])).person:await api('login',[{role}]);
+   if(!save('person-'+role,next))throw Error('担当を保存できません。ブラウザーの保存設定を確認してください。');
+   if(role==='admin'||role==='display')localStorage.setItem('techspresso-session',JSON.stringify(next));
+   close();window.location.assign(role==='admin'?'/staff?tab=admin':role==='display'?'/staff?tab=display':'/?screen='+role);
+  }catch(e){code.value='';error.textContent=e.message;error.hidden=false;submit.disabled=false;}
+ };
+ dialog.querySelector('[data-logout]').onclick=async()=>{submit.disabled=true;try{if(person)await api('logout',[person.token]);save('person-'+screen,null);person=null;snapshot=null;close();$('#content').innerHTML='<section class="panel"><h2>担当を選択してください</h2><p>上の「担当を変更」から利用を開始できます。</p></section>';status('ログインを終了しました。');}catch(e){error.textContent=e.message;error.hidden=false;submit.disabled=false;}};
+ dialog.showModal();
+}
 function status(text,error=false){if(!error&&text.startsWith('最新の一覧')&&$('#status').dataset.keep==='true')return;$('#status').dataset.keep=String(error&&/受付済み|読み取り済み/.test(text));$('#status').textContent=text;$('#status').className=error?'notice danger':'notice';}
 function lines(){return menu.filter(m=>Number(draft[m.id])>0).map(m=>({menuId:m.id,quantity:Number(draft[m.id])}));}
 function validated(id=crypto.randomUUID()){if(Object.values(draft).some(n=>!Number.isInteger(Number(n))||Number(n)<0||Number(n)>20))throw Error('各商品の杯数は0〜20の整数で入力してください。');return parseOrder({v:1,id,items:lines()},menu);}
@@ -36,7 +58,7 @@ async function login(){
   try{person=(await api('rpc',[old.token,'openRole',{role:screen}])).person;}
   catch(e){if(!e.expired)throw e;person=await api('login',[{role:screen}]);}
  }else person=await api('login',[{role:screen}]);
- save('person-'+screen,person);await refresh();
+ save('person-'+screen,person);updateRoleLabel();await refresh();
 }
 async function refresh(){if(refreshing||busy)return;refreshing=true;try{const next=await api('rpc',[person.token,'snapshot']);if(!snapshot||next.state.version>=snapshot.state.version)snapshot=next;lastSuccess=Date.now();if(pending)await reconcile();if(screen==='cashier'&&!$('#receipt'))cashierRender();if(screen==='cashier')updateReceipt();else handoverRender();status('最新の一覧を取得しました（'+new Date().toLocaleTimeString('ja-JP')+'）');}catch(e){if(e.expired){person=null;save('person-'+screen,null);}status('更新できません。古い一覧です。新規登録前に接続を確認してください。 '+e.message,true);}finally{refreshing=false;}}
 function cashierRender(){
@@ -88,6 +110,6 @@ function showPending(){if(!pending)return;$('#pending').hidden=false;$('#pending
 function handoverRender(){if(!snapshot)return;const orders=snapshot.state.orders.filter(o=>!o.cancelled&&o.items.some(i=>!i.deliveredAt)).sort((a,b)=>a.createdAt.localeCompare(b.createdAt));$('#content').innerHTML='<h2>提供待ち · '+orders.length+'件</h2><p>実際に渡した杯にチェックを入れ、提供済みにします。全杯提供した注文は一覧から消えます。</p><label><input id="collected" type="checkbox" '+(collected?'checked':'')+'> 全杯を提供する番号札は、お客様から回収しました</label><button id="deliver" class="primary" '+(busy||pending?'disabled':'')+'>選択した杯をまとめて提供済みにする</button><div>'+orders.map(o=>{const mins=Math.floor((Date.now()-Date.parse(o.createdAt))/60000),late=mins>=snapshot.waitThresholdMinutes;return '<article class="panel '+(late?'danger':'')+'"><h2>札 '+esc(o.ticket)+' · '+mins+'分経過</h2><time>'+new Date(o.createdAt).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})+'</time><label><input type="checkbox" data-all="'+o.id+'" '+(o.items.filter(i=>!i.deliveredAt).every(i=>selection[o.id+':'+i.number])?'checked':'')+'> 残りすべてを選択</label>'+o.items.filter(i=>!i.deliveredAt).map(i=>'<label><input type="checkbox" data-cup="'+o.id+':'+i.number+'" '+(selection[o.id+':'+i.number]?'checked':'')+'> '+esc(title(menu.find(m=>m.id===i.menuId)))+' '+esc(i.temperature||'Iced')+' · '+i.number+'/'+o.items.length+'</label>').join('')+'</article>';}).join('')+'</div>';
  $('#collected').onchange=e=>{collected=e.target.checked;};document.querySelectorAll('[data-cup]').forEach(c=>c.onchange=()=>{selection[c.dataset.cup]=c.checked;handoverRender();});document.querySelectorAll('[data-all]').forEach(c=>c.onchange=()=>{orders.find(o=>o.id===c.dataset.all).items.filter(i=>!i.deliveredAt).forEach(i=>selection[c.dataset.all+':'+i.number]=c.checked);handoverRender();});$('#deliver').onclick=()=>{try{pending={...deliveryRequest(orders,selection,collected),id:crypto.randomUUID()};}catch(e){return status(e.message,true);}if(!save('pending-'+screen,pending)){pending=null;return status('再送情報を保存できません。紙で管理してください。',true);}sendPending();};
 }
-if(!customer){const hub=$('[data-staff-hub]');hub.onclick=e=>{if(busy||pending){e.preventDefault();status('保存状態を確認してから担当を変更してください。',true);return;}try{if(person)localStorage.setItem('techspresso-session',JSON.stringify(person));}catch{}};const reload=document.createElement('button');reload.textContent='接続を確認・一覧を更新';reload.onclick=()=>person?refresh():login().catch(e=>status(e.message,true));$('header nav').append(reload);}
+if(!customer){$('#change-role').onclick=changeRole;updateRoleLabel();const hub=$('[data-staff-hub]');hub.onclick=e=>{if(busy||pending){e.preventDefault();status('保存状態を確認してから担当を変更してください。',true);return;}try{if(person)localStorage.setItem('techspresso-session',JSON.stringify(person));}catch{}};const reload=document.createElement('button');reload.textContent='一覧を更新';reload.onclick=()=>person?refresh():login().catch(e=>status(e.message,true));$('header nav').append(reload);}
 if(customer){$('header nav').hidden=true;$('#environment').textContent=$('#environment').textContent.replace('スタッフ用（公開環境）','お客様用（公開環境）');customerRender();if('serviceWorker' in navigator)navigator.serviceWorker.register('/order-sw.js').catch(()=>{});}else{status('接続中…');login().catch(e=>status(e.message,true));setInterval(()=>{if(person&&!document.hidden)refresh();},5000);if(pending)showPending();}
 window.addEventListener('pagehide',stopScan);

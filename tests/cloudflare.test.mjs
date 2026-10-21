@@ -13,16 +13,17 @@ function orderingHarness({registered=false,customer=false,deferPermission=false}
  let stopped=0,resolveCamera;
  const video={readyState:2,videoWidth:640,videoHeight:480,async play(){}};elements['#camera']={scrollIntoView(){}};elements['#camera video']=video;
  const plus={dataset:{plus:'blend-hot'}},minus={dataset:{minus:'blend-hot'}},orderQR={v:1,id:crypto.randomUUID(),items:[{menuId:'blend-hot',quantity:1}]};
+ const parts=Object.fromEntries(['[name="role"]','[name="code"]','[type="submit"]','[data-error]','[data-code]','[data-cancel]','form','[data-logout]'].map(k=>[k,{value:'',hidden:true,disabled:false}]));const dialog={querySelector:k=>parts[k],close(){},remove(){},showModal(){}};let destination='';
  const stream={getTracks:()=>[{stop(){stopped++;}}]};
  const context=vm.createContext({URLSearchParams,crypto,location:{pathname:customer?'/order':'/',search:''},localStorage:{getItem:()=>null,setItem(){}},setTimeout(){},
   navigator:{mediaDevices:{getUserMedia:()=>deferPermission?new Promise(resolve=>{resolveCamera=resolve;}):Promise.resolve(stream)}},
-  document:{querySelector:s=>elements[s]||null,querySelectorAll:s=>s==='[data-plus]'?[plus]:s==='[data-minus]'?[minus]:[],createElement:()=>({getContext:()=>({drawImage(){},getImageData:()=>({data:[]})})})},
+  window:{location:{assign:url=>{destination=url;}}},document:{body:{appendChild(){}},querySelector:s=>elements[s]||null,querySelectorAll:s=>s==='[data-plus]'?[plus]:s==='[data-minus]'?[minus]:[],createElement:tag=>tag==='dialog'?dialog:({getContext:()=>({drawImage(){},getImageData:()=>({data:[]})})})},
   jsQR:()=>({data:JSON.stringify(orderQR)}),parseOrder,deliveryRequest,
   respond:async()=>({registered,ticket:'A'}),orderQR});
  let source=fs.readFileSync(new URL('../cloudflare/ordering-client.mjs',import.meta.url),'utf8');
  source=source.slice(0,source.lastIndexOf('\nif(!customer){')).replace(/import[^\n]+\n/,'').replace('/* BUILD_MENU */[]',JSON.stringify([{id:'blend-hot',name:'Dark Roast Blend',displayName:'ブレンド',temperature:'Hot',price:500}]));
- vm.runInContext(source+`\napi=async()=>respond();person={token:'local-test'};globalThis.probe={startScan,stopScan,editor,bindEditor,newCustomerOrder,validated,setSelected(){qrOrder=orderQR;ticket='B';cash=true;draft={'blend-hot':1};},getState(){return {ticket,cash,qrOrder,draft,busy};}};`,context);
- return {probe:context.probe,elements,plus,minus,stopped:()=>stopped,allowCamera:()=>resolveCamera(stream)};
+ vm.runInContext(source+`\napi=async()=>respond();person={token:'local-test'};globalThis.probe={startScan,stopScan,editor,bindEditor,newCustomerOrder,validated,changeRole,setCall(fn){api=fn;},setPending(value){pending=value;},setSelected(){qrOrder=orderQR;ticket='B';cash=true;draft={'blend-hot':1};},getState(){return {ticket,cash,qrOrder,draft,busy};}};`,context);
+ return {probe:context.probe,elements,parts,destination:()=>destination,plus,minus,stopped:()=>stopped,allowCamera:()=>resolveCamera(stream)};
 }
 
 test('カメラ: 非同期の受付済みエラーを表示し、カメラを閉じて停止する',async()=>{
@@ -227,4 +228,19 @@ test('Cloudflare: 開発用とスタッフ用は異なるWorkerとDBを使い、
   const production=fs.readFileSync(new URL('../.cloudflare-build/public-production/index.html',import.meta.url),'utf8');assert.match(production,/スタッフ用（公開環境）/);assert.doesNotMatch(production,/Cloudflare検証版（開発用）/);
   const dev=fixture(),live=fixture(),cash=await dev.login();await order(dev,cash);
   assert.equal(live.orders().length,0);assert.equal((await live.rpc(cash,'snapshot')).sessionExpired,true);
+});
+
+
+test('担当ダイアログ: 従来の選択方式から現在の提供画面へ移り、保存中は切り替えない',async()=>{
+ const h=orderingHarness(),calls=[];h.probe.setCall(async(method,args)=>{calls.push({method,args});return {ok:true,person:{role:'handover',token:'independent-role-session'}};});
+ h.probe.changeRole();h.parts['[name="role"]'].value='handover';await h.parts.form.onsubmit({preventDefault(){}});
+ assert.equal(calls[0].args[1],'openRole');assert.equal(h.destination(),'/?screen=handover');
+ const busy=orderingHarness();busy.probe.setPending({action:'createOrder'});busy.probe.changeRole();assert.match(busy.elements['#status'].textContent,/保存完了後/);assert.equal(busy.parts.form.onsubmit,undefined);
+});
+
+test('担当ダイアログ: 一般から管理者を選ぶとコードを求め、コードは保存せず認証APIへ送る',async()=>{
+ const h=orderingHarness(),calls=[];h.probe.setCall(async(method,args)=>{calls.push({method,args});return {role:'admin',baseRole:'admin',token:'local-test-admin'};});h.probe.changeRole();
+ h.parts['[name="role"]'].value='admin';h.parts['[name="role"]'].onchange();assert.equal(h.parts['[data-code]'].hidden,false);assert.equal(h.parts['[name="code"]'].required,true);
+ h.parts['[name="code"]'].value='local-test-only-not-a-real-code';await h.parts.form.onsubmit({preventDefault(){}});
+ assert.equal(calls[0].method,'login');assert.equal(h.parts['[name="code"]'].value,'');assert.equal(h.destination(),'/staff?tab=admin');
 });
