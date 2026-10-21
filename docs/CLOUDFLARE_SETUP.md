@@ -4,6 +4,12 @@
 
 開発用： https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/
 
+お客様用本番： https://techspresso-coffee-app.hamaoka123123.workers.dev/order
+
+お客様用開発： https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/order
+
+2026-10-21のUI統一リリースで、注文QR・レジ手入力・提供の3画面を本番へ反映します。操作手順は[注文QRガイド](ORDER_QR.md)を参照してください。
+
 | 環境 | Worker | D1 |
 | --- | --- | --- |
 | スタッフ用 | techspresso-coffee-app | techspresso-coffee-app-production-db |
@@ -67,7 +73,7 @@ npm exec -- wrangler d1 migrations apply techspresso-coffee-app-production-db --
 
 ## 確認済みと残る事項
 
-- 既存88件とCloudflare13件の計101件のローカルテストに成功。環境間のデータとセッションの分離も確認。
+- 既存88件とCloudflare25件の計113件のローカルテストに成功。環境間のデータとセッションの分離も確認。
 - 公開検証版で独立した5セッション、4担当の同時操作、重複再送、二重提供防止、取消・直接受領を確認。
 - このPCから27回のAPI通信は中央値118ms、最大252ms。実端末・混雑時の保証ではありません。
 - 無料プランで公開。有料プランへ変更していません。無料枠超過時は処理が制限されます。
