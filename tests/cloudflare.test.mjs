@@ -9,7 +9,7 @@ import jsQR from 'jsqr';
 import vm from 'node:vm';
 
 function orderingHarness({registered=false,customer=false,deferPermission=false}={}){
- const elements=Object.fromEntries(['#scanner-slot','#status','#scan-feedback','#stop','#edit','#menu-editor','#qr'].map(k=>[k,{innerHTML:'',textContent:'',dataset:{},scrollIntoView(){}}]));
+ const elements=Object.fromEntries(['#scanner-slot','#status','#scan-feedback','#stop','#edit','#menu-editor','#qr','#customer-total','#customer-count'].map(k=>[k,{innerHTML:'',textContent:'',dataset:{},scrollIntoView(){}}]));
  let stopped=0,resolveCamera;
  const video={readyState:2,videoWidth:640,videoHeight:480,async play(){}};elements['#camera']={scrollIntoView(){}};elements['#camera video']=video;
  const plus={dataset:{plus:'blend-hot'}},minus={dataset:{minus:'blend-hot'}},orderQR={v:1,id:crypto.randomUUID(),items:[{menuId:'blend-hot',quantity:1}]};
@@ -39,7 +39,7 @@ test('カメラ: 許可待ちの間に閉じた場合、後から許可されて
 });
 
 test('杯数: お客様・レジ共通の−／＋で0→1→0となり、負数や21杯には進まない',()=>{
- for(const customer of [true,false]){const h=orderingHarness({customer});assert.doesNotMatch(h.probe.editor(),/type="number"/);h.probe.bindEditor();h.plus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],1);assert.match(h.probe.editor(),/>1杯<\/output>/);h.minus.onclick();h.minus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],0);for(let i=0;i<25;i++)h.plus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],20);}
+ for(const customer of [true,false]){const h=orderingHarness({customer});assert.doesNotMatch(h.probe.editor(),/type="number"/);h.probe.bindEditor();h.plus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],1);if(customer){assert.equal(h.elements['#customer-total'].textContent,'合計 500円');assert.equal(h.elements['#customer-count'].textContent,'1杯');}assert.match(h.probe.editor(),/>1杯<\/output>/);h.minus.onclick();h.minus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],0);if(customer)assert.equal(h.elements['#customer-total'].textContent,'合計 0円');for(let i=0;i<25;i++)h.plus.onclick();assert.equal(h.probe.getState().draft['blend-hot'],20);}
 });
 
 test('提供画面: 1札は単独API、複数札は一括API。部分提供と回収確認を区別する',async()=>{
