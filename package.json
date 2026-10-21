@@ -9,8 +9,10 @@
     "test:unit": "node --test tests/core.test.mjs tests/backend.test.mjs tests/client.test.mjs tests/alerts.test.mjs tests/discord-relay.test.mjs",
     "build:cloudflare": "node cloudflare/build.mjs",
     "test:cloudflare": "npm run build:cloudflare && node --test tests/cloudflare.test.mjs",
-    "dev:cloudflare": "npm run build:cloudflare && wrangler dev",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy"
+    "dev:cloudflare": "npm run build:cloudflare && wrangler dev --env dev",
+    "deploy:dev": "npm run build:cloudflare && wrangler deploy --env dev",
+    "deploy:production": "npm run build:cloudflare && wrangler deploy",
+    "deploy:cloudflare": "npm run deploy:dev"
   },
   "engines": {
     "node": ">=22"

@@ -1,15 +1,24 @@
-# Cloudflare検証版の公開と開発
+# Cloudflareのスタッフ用・開発用
 
-アプリ： https://techspresso-coffee-app.hamaoka123123.workers.dev/
+スタッフ用： https://techspresso-coffee-app.hamaoka123123.workers.dev/
 
-Worker：`techspresso-coffee-app`。保存先：今回専用D1 `techspresso-coffee-app-db`。
+開発用： https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/
 
-会計・受け渡し・表示専用はコードなしで使えます。これは実際のD1へ保存する検証版です。旧Apps Scriptの実注文、スプレッドシート、売上シミュレーション、シフト、Discord通知にはまだ接続していません。旧環境の本番切替やデータ移行は行っていません。
+| 環境 | Worker | D1 |
+| --- | --- | --- |
+| スタッフ用 | techspresso-coffee-app | techspresso-coffee-app-production-db |
+| 開発用 | techspresso-coffee-app-dev | techspresso-coffee-app-db |
+
+URL、注文・操作記録、ログイン、設定値、管理者コードを分離します。開発用を更新してもスタッフ用のコードは変わりません。初回のテスト履歴は開発用に残し、スタッフ用は空の記録から開始します。
+
+会計・受け渡し・表示専用はコードなしで使えます。両方とも実際のD1へ保存します。旧Apps Scriptの実注文、スプレッドシート、売上シミュレーション、シフト、Discord通知にはまだ接続していません。旧環境の本番切替やデータ移行は行っていません。
 
 ## 管理者コードの設定
 
 本人がCloudflareダッシュボードへログインし、Workers & Pages → techspresso-coffee-app → Settings → Variables and Secretsで、種類Secret、名前`ADMIN_CODE`、値12〜200文字のコードを設定・保存してください。
 値はGitHub、チャット、スクリーンショットへ含めません。未設定では管理者だけがログインできません。既存のDiscord通知Workerとは別の設定です。
+
+開発用の管理者操作も試す場合は、`techspresso-coffee-app-dev`へ別のコードを設定します。スタッフ用のSecretは開発用に自動ではコピーされません。
 
 ## ローカル開発
 
@@ -19,7 +28,7 @@ Node.js 24を推奨します。
 npm ci --ignore-scripts
 npm test
 npm run build:cloudflare
-npm exec -- wrangler d1 migrations apply techspresso-coffee-app-db --local
+npm exec -- wrangler d1 migrations apply techspresso-coffee-app-db --local --env dev
 npm run dev:cloudflare
 ```
 
@@ -33,14 +42,18 @@ npm run dev:cloudflare
 ```sh
 npm test
 npm run build:cloudflare
-npm exec -- wrangler deploy --dry-run
-npm run deploy:cloudflare
+npm exec -- wrangler deploy --env dev --dry-run
+npm run deploy:dev
 ```
 
-DB構造を変更したときだけ、新しいSQLをレビューしてから今回専用DBへ適用します。
+開発用で機能を確認し、スタッフ用へ反映すると決めた場合だけ、`npm run deploy:production`を実行します。`npm run deploy:cloudflare`は誤公開を避けるため開発用へ向けています。
+
+DB構造を変更したときだけ、新しいSQLをレビューして対象DBへ適用します。
 
 ```sh
-npm exec -- wrangler d1 migrations apply techspresso-coffee-app-db --remote
+npm exec -- wrangler d1 migrations apply techspresso-coffee-app-db --remote --env dev
+# スタッフ用へ反映する段階でのみ実行
+npm exec -- wrangler d1 migrations apply techspresso-coffee-app-production-db --remote
 ```
 
 適用済みの初期SQLを後から変更せず、新しいマイグレーションを追加します。コードを戻してもDB構造や注文は自動で戻りません。
@@ -54,11 +67,11 @@ npm exec -- wrangler d1 migrations apply techspresso-coffee-app-db --remote
 
 ## 確認済みと残る事項
 
-- 既存88件とCloudflare12件の計100件のローカルテストに成功。
+- 既存88件とCloudflare13件の計101件のローカルテストに成功。環境間のデータとセッションの分離も確認。
 - 公開検証版で独立した5セッション、4担当の同時操作、重複再送、二重提供防止、取消・直接受領を確認。
 - このPCから27回のAPI通信は中央値118ms、最大252ms。実端末・混雑時の保証ではありません。
 - 無料プランで公開。有料プランへ変更していません。無料枠超過時は処理が制限されます。
 - 管理者コードは本人のSecret設定が必要。
 - 外部連携、表示名除去、旧注文移行、定期バックアップ/保持期間、本番切替は未完了です。外部連携ボタンは未接続の案内を返し、旧環境へ書き込みません。
 - GitHub Actionsは手動テストのみ。Cloudflareへの自動公開接続・共同開発者のCloudflare権限は未設定です。
-- 初回公開：2026-10-21。検証用の注文履歴は削除せず残していますが、使用した札は全て再使用可能へ戻しました。
+- 初回公開：2026-10-21。検証履歴は開発用に残し、使用した札は全て再使用可能へ戻しました。スタッフ用へテスト注文はコピーしません。

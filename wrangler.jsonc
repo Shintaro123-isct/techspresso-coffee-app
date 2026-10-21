@@ -7,7 +7,7 @@
 	"workers_dev": true,
 	"preview_urls": false,
 	"assets": {
-		"directory": ".cloudflare-build/public",
+		"directory": ".cloudflare-build/public-production",
 		"binding": "ASSETS",
 		"run_worker_first": [
 			"/api/*",
@@ -15,17 +15,34 @@
 		]
 	},
 	"vars": {
-		"APP_MODE": "preview"
+		"APP_MODE": "production"
 	},
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "techspresso-coffee-app-db",
-			"database_id": "969a305c-a933-45ff-9393-bb6018cf5e6c",
+			"database_name": "techspresso-coffee-app-production-db",
+			"database_id": "34ef736d-1c8e-48de-ab5a-3fcb33ce9426",
 			"migrations_dir": "cloudflare/migrations"
 		}
 	],
 	"observability": {
 		"enabled": false
+	},
+	"env": {
+		"dev": {
+			"name": "techspresso-coffee-app-dev",
+			"vars": {"APP_MODE": "development"},
+			"assets": {
+				"directory": ".cloudflare-build/public-development",
+				"binding": "ASSETS",
+				"run_worker_first": ["/api/*", "/health"]
+			},
+			"d1_databases": [{
+				"binding": "DB",
+				"database_name": "techspresso-coffee-app-db",
+				"database_id": "969a305c-a933-45ff-9393-bb6018cf5e6c",
+				"migrations_dir": "cloudflare/migrations"
+			}]
+		}
 	}
 }

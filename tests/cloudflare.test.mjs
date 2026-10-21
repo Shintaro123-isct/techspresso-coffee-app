@@ -98,7 +98,16 @@ test('Cloudflare: 管理者コードを変えると以前の管理者セッシ�
 });
 
 test('Cloudflare: 検証版の公開画面は実APIを使い、旧Sheetsへ書き込む表示を残さない',()=>{
-  const html=fs.readFileSync(new URL('../.cloudflare-build/public/index.html',import.meta.url),'utf8');
+  const html=fs.readFileSync(new URL('../.cloudflare-build/public-development/index.html',import.meta.url),'utf8');
   assert.match(html,/window.TECHSPRESSO_CLOUDFLARE=true/);assert.match(html,/fetch\('\/api\//);assert.match(html,/Cloudflare検証版/);assert.match(html,/売上シミュレーションとは未接続/);
   assert.doesNotMatch(html,/BUILD_CLIENT|BUILD_LOGO|BUILD_STYLES/);
+});
+
+test('Cloudflare: 開発用とスタッフ用は異なるWorkerとDBを使い、画面の環境名も分離する',async()=>{
+  const config=JSON.parse(fs.readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8'));
+  assert.notEqual(config.name,config.env.dev.name);assert.notEqual(config.d1_databases[0].database_id,config.env.dev.d1_databases[0].database_id);
+  assert.equal(config.vars.APP_MODE,'production');assert.equal(config.env.dev.vars.APP_MODE,'development');
+  const production=fs.readFileSync(new URL('../.cloudflare-build/public-production/index.html',import.meta.url),'utf8');assert.match(production,/スタッフ用（公開環境）/);assert.doesNotMatch(production,/Cloudflare検証版（開発用）/);
+  const dev=fixture(),live=fixture(),cash=await dev.login();await order(dev,cash);
+  assert.equal(live.orders().length,0);assert.equal((await live.rpc(cash,'snapshot')).sessionExpired,true);
 });

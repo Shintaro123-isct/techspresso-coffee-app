@@ -4,12 +4,16 @@ import {fileURLToPath} from 'node:url';
 const root=path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const read=name=>fs.readFileSync(path.join(root,name),'utf8');
 const out=path.join(root,'.cloudflare-build');
-fs.mkdirSync(path.join(out,'public'),{recursive:true});
+fs.mkdirSync(out,{recursive:true});
 fs.writeFileSync(path.join(out,'core.mjs'),read('src/core.js')+'\nexport default CoffeeCore_;\n');
 const logo='<svg class="brand-logo" viewBox="270 420 540 540" role="img" aria-label="TECHSPRESSO公式ロゴ" xmlns="http://www.w3.org/2000/svg" overflow="hidden"><image width="1080" height="1350" href="data:image/png;base64,'+fs.readFileSync(path.join(root,'assets/techspresso-official.png')).toString('base64')+'"/></svg>';
-let html=read('src/Index.html').replace('<!-- BUILD_LOGO -->',()=>logo).replace('/* BUILD_STYLES */',()=>read('src/styles.css')).replace('/* BUILD_CORE */',()=> 'window.TECHSPRESSO_CLOUDFLARE=true;').replace('/* BUILD_CLIENT */',()=>read('src/client.js'));
-html=html.replace('<div id="demo-banner" hidden>体験版 · この端末内だけの動作です。Googleスプレッドシートには接続していません。</div>','<div id="cloudflare-banner" style="background:#fff0c7;padding:10px;text-align:center;font-weight:600">Cloudflare検証版 · 注文は専用データベースへ保存します。旧アプリ・売上シミュレーションとは未接続です。</div>');
-html=html.replace(/<details class="panel"[\s\S]*?<\/details>/,'<details class="panel" style="max-width:1100px;margin:20px auto;padding:20px"><summary>Cloudflare検証版について</summary><p>旧Apps Script版とは独立した記録です。本番営業には切り替えていません。注文・提供・取消・番号札の返却を試せます。</p><p>保存中は結果を待ち、不明な場合は同じ操作を再送してください。画面で選んだだけでは提供済みになりません。取消時に札がない場合は、会計担当が実物の受領を確認するまで再使用できません。</p><p>既存のスプレッドシート、シミュレーション、Discord通知にはまだ接続していません。管理者コードはCloudflareのSecretに設定します。</p></details>');
-fs.writeFileSync(path.join(out,'public/index.html'),html);
-fs.writeFileSync(path.join(out,'public/_headers'),'/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Cache-Control: no-cache\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; connect-src \'self\'; frame-ancestors \'none\'; base-uri \'none\'; form-action \'self\'\n');
-console.log('Cloudflareの画面と共通状態機械をビルドしました。');
+for(const mode of ['development','production']){
+  const production=mode==='production',dir=path.join(out,'public-'+mode);fs.mkdirSync(dir,{recursive:true});
+  const title=production?'スタッフ用（公開環境）':'Cloudflare検証版（開発用）';
+  let html=read('src/Index.html').replace('<!-- BUILD_LOGO -->',()=>logo).replace('/* BUILD_STYLES */',()=>read('src/styles.css')).replace('/* BUILD_CORE */',()=> 'window.TECHSPRESSO_CLOUDFLARE=true;').replace('/* BUILD_CLIENT */',()=>read('src/client.js'));
+  html=html.replace('<div id="demo-banner" hidden>体験版 · この端末内だけの動作です。Googleスプレッドシートには接続していません。</div>','<div id="cloudflare-banner" style="background:'+(production?'#e8efe8':'#fff0c7')+';padding:10px;text-align:center;font-weight:600">'+title+' · '+(production?'開発用とは別の記録です。スプレッドシート・通知は未接続です。':'テスト専用の記録です。スタッフ用の注文は変わりません。旧アプリ・売上シミュレーションとは未接続です。')+'</div>');
+  html=html.replace(/<details class="panel"[\s\S]*?<\/details>/,'<details class="panel" style="max-width:1100px;margin:20px auto;padding:20px"><summary>'+title+'について</summary><p>開発用とスタッフ用の記録は別々です。旧Apps Script版とは独立しており、本番営業の接続先は切り替えていません。</p><p>保存中は結果を待ち、不明な場合は同じ操作を再送してください。画面で選んだだけでは提供済みになりません。取消時に札がない場合は、会計担当が実物の受領を確認するまで再使用できません。</p><p>既存のスプレッドシート、シミュレーション、Discord通知にはまだ接続していません。管理者コードは各環境のCloudflare Secretに設定します。</p></details>');
+  fs.writeFileSync(path.join(dir,'index.html'),html);
+  fs.writeFileSync(path.join(dir,'_headers'),'/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Cache-Control: no-cache\n  Content-Security-Policy: default-src \'self\'; script-src \'self\' \'unsafe-inline\'; style-src \'self\' \'unsafe-inline\'; img-src \'self\' data:; connect-src \'self\'; frame-ancestors \'none\'; base-uri \'none\'; form-action \'self\'\n');
+}
+console.log('開発用・スタッフ用の画面と共通状態機械をビルドしました。');
