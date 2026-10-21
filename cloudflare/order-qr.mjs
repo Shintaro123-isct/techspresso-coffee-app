@@ -1,6 +1,6 @@
 // Shared validation. A unique, non-personal ID distinguishes identical baskets.
 export function parseOrder(value, menu) {
-  if (typeof value === 'string') { if(value.length>2000)throw Error('QRが長すぎます。'); value=JSON.parse(value); }
+  if (typeof value === 'string') { if(value.length>2000)throw Error('QRが長すぎます。'); try{value=JSON.parse(value);}catch{throw Error('TECHSPRESSOの注文QRではありません。お客様の注文画面に表示されたQRを読み取ってください。');} }
   if (!value || value.v!==1 || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value.id||'')) throw Error('TECHSPRESSOの注文QRではありません。');
   if(!Array.isArray(value.items)||!value.items.length||value.items.length>menu.length)throw Error('商品数を確認してください。');
   const seen=new Set();let count=0,total=0;
