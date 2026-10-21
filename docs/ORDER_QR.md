@@ -1,7 +1,13 @@
-# 注文QR・現金レジ・提供（開発版）
+# 注文QR・現金レジ・提供
 
-2026-10-21。スタッフ用には未反映。Airレジ・Sheets・シミュレーション・Discordと未接続。
+2026-10-21。本番用と開発用で、以前の色付き温度ラベル・大きい日本語商品名・−／＋ボタンへUIを統一。Airレジ・Sheets・シミュレーション・Discordと未接続。
 
+| 用途 | 本番用 | 開発用 |
+| --- | --- | --- |
+| お客様 | https://techspresso-coffee-app.hamaoka123123.workers.dev/order | https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/order |
+| スタッフ | https://techspresso-coffee-app.hamaoka123123.workers.dev/ | https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/ |
+
+以下は開発用の直接リンクです。
 - お客様: https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/order
 - レジ: https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/?screen=cashier
 - 提供: https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/?screen=handover

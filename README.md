@@ -1,13 +1,13 @@
 # 工大祭2026 TECHSPRESSO 受け渡し管理
 
-ドリンク7種類の注文、カップごとの提供、番号札の回収と会計側への返却確認を管理するApps Script Webアプリです。会計・売上・商品別注文数の基準はAirレジです。
+お客様の注文QR、レジでの代金受領確認、ドリンク7種類の注文、カップごとの提供、番号札の回収・返却を管理するCloudflare Workers + D1アプリです。Airレジとは連携しません。旧Apps Scriptのソースも保持しています。
 
 ## 共同開発・Cloudflare移行
 
 現行Apps Script版を基準に、Cloudflare Workers + D1版へ移行するためのリポジトリです。
 Cloudflare版はスタッフ用と開発用を、別のURL・別のデータベースで公開しています。旧Apps Script版の本番やシミュレーション接続先は変更していません。
 
-**[スタッフ用を開く](https://techspresso-coffee-app.hamaoka123123.workers.dev/)** ／ **[開発・テスト用を開く](https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/)**
+**[お客様用を開く](https://techspresso-coffee-app.hamaoka123123.workers.dev/order)** ／ **[スタッフ用を開く](https://techspresso-coffee-app.hamaoka123123.workers.dev/)** ／ **[開発・テスト用を開く](https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/)**
 
 一般担当はコード不要。管理者コードの設定、開発・公開方法、未接続の機能は[Cloudflare設定手順](docs/CLOUDFLARE_SETUP.md)を参照してください。GitHubへのpushやマージだけでは自動公開されません。
 
@@ -19,9 +19,9 @@ Cloudflare版はスタッフ用と開発用を、別のURL・別のデータベ�
 
 ## 現行版の機能
 
-### 開発用の新しい3画面
+### お客様・レジ・提供の3画面
 
-お客様の注文QR → 現金レジ（手入力も可）→ 未提供一覧に対応しました。[画面URL・QR形式・障害時手順・実端末での確認](docs/ORDER_QR.md)を参照してください。スタッフ用への反映は別途指示後です。以下は `/legacy` に残している既存Apps Script由来の機能説明です。Cloudflareでは外部連携は未接続です。
+お客様の注文QR → 現金レジ（手入力も可）→ 未提供一覧に対応しました。[画面URL・QR形式・障害時手順・実端末での確認](docs/ORDER_QR.md)を参照してください。2026-10-21に、以前の色付き温度ラベル・大きい商品名・−／＋を使うUIへ統一し、スタッフ用本番にも反映します。以下は `/legacy` に残している既存Apps Script由来の機能説明です。Cloudflareでは外部連携は未接続です。
 
 会計担当・受け渡し担当・管理者・表示専用の4つの担当があります。表示名入力はありません。
 
