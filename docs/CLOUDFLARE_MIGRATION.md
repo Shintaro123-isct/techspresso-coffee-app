@@ -12,7 +12,8 @@
 ## 今回のGitHub準備に含むもの
 
 現行Apps Script版のコード、独立した模擬テスト、公式ロゴ、通知中継コード、共同開発手順。
-Cloudflare版はまだ実装していません。GitHubへ保存しただけでは新しいアプリURLは発行されません。
+2026-10-21にCloudflare版を実装し、開発用とスタッフ用を別Worker・別D1で公開しました。URLと操作手順は[CLOUDFLARE_SETUP.md](CLOUDFLARE_SETUP.md)を参照してください。
+旧Apps Scriptの接続先は維持しています。Cloudflare版のスプレッドシート・シミュレーション・Discord連携と、本番営業への切替はまだ行っていません。
 
 ## 次の段階
 

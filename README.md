@@ -5,7 +5,11 @@
 ## 共同開発・Cloudflare移行
 
 現行Apps Script版を基準に、Cloudflare Workers + D1版へ移行するためのリポジトリです。
-Cloudflare版はまだ実装・公開していません。GitHubへのpushやマージだけでは、現在の公開アプリは変わりません。
+Cloudflare版はスタッフ用と開発用を、別のURL・別のデータベースで公開しています。旧Apps Script版の本番やシミュレーション接続先は変更していません。
+
+**[スタッフ用を開く](https://techspresso-coffee-app.hamaoka123123.workers.dev/)** ／ **[開発・テスト用を開く](https://techspresso-coffee-app-dev.hamaoka123123.workers.dev/)**
+
+一般担当はコード不要。管理者コードの設定、開発・公開方法、未接続の機能は[Cloudflare設定手順](docs/CLOUDFLARE_SETUP.md)を参照してください。GitHubへのpushやマージだけでは自動公開されません。
 
 開発用リポジトリ：[Shintaro123-isct/techspresso-coffee-app](https://github.com/Shintaro123-isct/techspresso-coffee-app)
 

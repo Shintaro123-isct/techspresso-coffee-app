@@ -12,6 +12,13 @@
 /docs/*
 !/docs/CLOUDFLARE_MIGRATION.md
 !/docs/GITHUB_SETUP.md
+!/docs/CLOUDFLARE_SETUP.md
+!/cloudflare/
+/cloudflare/*
+!/cloudflare/worker.mjs
+!/cloudflare/build.mjs
+!/cloudflare/migrations/
+!/wrangler.jsonc
 !/src/
 /src/*
 !/src/core.js
@@ -33,6 +40,7 @@
 !/tests/client.test.mjs
 !/tests/alerts.test.mjs
 !/tests/discord-relay.test.mjs
+!/tests/cloudflare.test.mjs
 !/.github/
 /.github/*
 !/.github/workflows/

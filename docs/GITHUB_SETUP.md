@@ -6,7 +6,7 @@
 - リポジトリ： https://github.com/Shintaro123-isct/techspresso-coffee-app
 - 公開範囲：本人の許可によりPublic
 - 既存の別アプリのリポジトリは変更しない
-- Cloudflareとはまだ未接続。マージやpushで本番へ自動公開される設定はない
+- Cloudflare版は2環境を公開済み。ただしGitHubとCloudflareの自動公開接続は未設定。マージやpushだけでスタッフ用は更新されない
 - 参加メンバーはSettings > Collaboratorsで本人のGitHubユーザー名を指定して招待する。公開コードの閲覧と直接pushする権限は別である
 
 ## 初期状態（2026-10-20確認）

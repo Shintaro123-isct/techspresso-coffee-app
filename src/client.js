@@ -1,6 +1,7 @@
 (function () {
   'use strict';
-  var demo=typeof google==='undefined' || !google.script || !google.script.run;
+  var cloudflare=typeof window!=='undefined'&&window.TECHSPRESSO_CLOUDFLARE===true;
+  var demo=!cloudflare&&(typeof google==='undefined' || !google.script || !google.script.run);
   var app=document.getElementById('app'), identity=document.getElementById('identity');
   var person=null, snapshot=null, tab='cashier', draft={},chosenTicket='',cupSelections={},returnSelections={},busy=false,pending=null,loading=false,lastSynced=0,noticeTimer,lastRegistered=null;
   var roleNames={cashier:'会計担当',handover:'受け渡し担当',admin:'管理者',display:'表示専用'};
@@ -37,6 +38,7 @@
   function rememberInputs(){try{app.querySelectorAll('form input[name]:not([type="password"])').forEach(function(f){if(f.name==='code')return;var key=f.form.id+':'+f.name;formInputs[key]=f.type==='checkbox'?f.checked:f.value;});localStorage.setItem('techspresso-inputs',JSON.stringify({draft:draft,chosenTicket:chosenTicket,cupSelections:cupSelections,returnSelections:returnSelections,tab:tab,formInputs:formInputs}));}catch(ignore){}}
   function restoreForms(){app.querySelectorAll('form input[name]:not([type="password"])').forEach(function(f){var key=f.form.id+':'+f.name;if(!(key in formInputs))return;if(f.type==='checkbox')f.checked=formInputs[key];else f.value=formInputs[key];});}
   function call(method,args){
+    if(cloudflare)return fetch('/api/'+method,{method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',body:JSON.stringify({args:args})}).then(async function(response){var result;try{result=await response.json();}catch(ignore){throw new Error('通信できませんでした。保存結果が不明な場合は再送してください。');}if(!response.ok)throw new Error(result.message||'通信できませんでした。');return result;});
     if(demo)return new Promise(function(resolve,reject){setTimeout(function(){try{resolve(demoCall(method,args));}catch(e){reject(e);}},120);});
     return new Promise(function(resolve,reject){google.script.run.withSuccessHandler(resolve).withFailureHandler(function(e){reject(new Error(e.message||'通信できませんでした。'));})[method].apply(google.script.run,args);});
   }
